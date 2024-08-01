@@ -6,7 +6,7 @@
 curl --request POST \
   --url http://127.0.0.1:3000/view \
   --data '{
-  "sql": "create table t(a int, b int);"
+  "sql": "create table t(a int, b int,c int,d int);"
 }'
 ```
 
@@ -19,6 +19,10 @@ curl --request POST \
   "sql": "select a from t;"
 }'
 ```
+
+send/recv data by mqtt broker 127.0.0.1:1883
+send data topic: /yisa/data
+recv data topic: /yisa/data2
 
 ## Delete the view
 
