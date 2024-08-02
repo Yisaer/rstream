@@ -10,19 +10,20 @@ use serde_json::Value;
 use tokio::sync::broadcast;
 
 use crate::{
-    core::{Datum, ErrorKind, SQLError, tuple::Tuple},
+    connector::MqttClient,
+    core::{tuple::Tuple, Datum, ErrorKind, SQLError},
     sql::{
         expression::{
             aggregate::{AggregateFunction, AggregateState},
             Expression,
         },
+        planner::binder::ProjItem,
         session::context::QueryContext,
     },
     storage::relation::ScanState,
 };
-use crate::connector::MqttClient;
 
-use super::{DDLJob};
+use super::DDLJob;
 
 /// These commands are used to build up an execting tree which executes on a stream
 /// They will be construct the tree and execting forever until we close them.
@@ -145,11 +146,11 @@ impl ExecuteTreeNode {
 #[derive(Debug)]
 pub struct ProjectExecutor {
     pub child: Box<ExecuteTreeNode>,
-    pub projections: Vec<(usize, String)>,
+    pub projections: Vec<ProjItem>,
 }
 
 impl ProjectExecutor {
-    pub fn new(child: Box<ExecuteTreeNode>, projections: Vec<(usize, String)>) -> Self {
+    pub fn new(child: Box<ExecuteTreeNode>, projections: Vec<ProjItem>) -> Self {
         Self { child, projections }
     }
 
@@ -207,7 +208,11 @@ impl ScanExecutor {
         let topic = String::from("/yisa/data");
         tokio::spawn(async move {
             info!("ScanExecutor listening");
-            mqtt_client.client.subscribe(topic, QoS::AtLeastOnce).await.unwrap();
+            mqtt_client
+                .client
+                .subscribe(topic, QoS::AtLeastOnce)
+                .await
+                .unwrap();
             loop {
                 let event = mqtt_client.event_loop.poll().await.unwrap();
                 while let Ok(notification) = mqtt_client.event_loop.poll().await {
@@ -215,7 +220,8 @@ impl ScanExecutor {
                         Event::Incoming(Packet::Publish(publish)) => {
                             // let topic = publish.topic.clone();
                             let message = String::from_utf8_lossy(&publish.payload);
-                            let parsed: HashMap<String, Value> = serde_json::from_str(message.as_ref()).unwrap();
+                            let parsed: HashMap<String, Value> =
+                                serde_json::from_str(message.as_ref()).unwrap();
                             let tuple = Tuple::from_hashmap(parsed);
                             // println!("recv {tuple}");
                             result_tx.send(Ok(Some(tuple))).unwrap();

@@ -19,8 +19,8 @@ pub enum Datum {
 
 impl Serialize for Datum {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-        where
-            S: Serializer,
+    where
+        S: Serializer,
     {
         match self {
             Datum::Int(i) => serializer.serialize_i64(*i),
@@ -34,8 +34,8 @@ impl Serialize for Datum {
 
 impl<'de> Deserialize<'de> for Datum {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-        where
-            D: Deserializer<'de>,
+    where
+        D: Deserializer<'de>,
     {
         let value = serde_json::Value::deserialize(deserializer)?;
         match value {

@@ -5,8 +5,8 @@ use std::{collections::HashMap, mem, sync::Arc};
 
 use axum::{
     extract::{self},
-    Json,
-    Router, routing::{delete, get, post},
+    routing::{delete, get, post},
+    Json, Router,
 };
 use log::{info, LevelFilter};
 use rumqttc::QoS;
@@ -15,18 +15,18 @@ use tokio::sync::{mpsc, Mutex};
 
 use catalog::Catalog;
 use core::Tuple;
-use sql::{runtime::executor::View, Session, session::context::QueryContext};
+use sql::{runtime::executor::View, session::context::QueryContext, Session};
 use storage::StorageManager;
 use util::SimpleLogger;
 
 use crate::connector::MqttClient;
 
 mod catalog;
+mod connector;
 mod core;
 mod sql;
 mod storage;
 mod util;
-mod connector;
 
 static LOGGER: SimpleLogger = SimpleLogger;
 
@@ -80,7 +80,11 @@ async fn execute_sql(
         tokio::spawn(async move {
             while let Ok(Ok(Some(v))) = receiver.recv().await {
                 let data = v.parse_into_json().unwrap();
-                sender.client.publish("/yisa/data2", QoS::AtLeastOnce, false, data).await.unwrap();
+                sender
+                    .client
+                    .publish("/yisa/data2", QoS::AtLeastOnce, false, data)
+                    .await
+                    .unwrap();
             }
             info!("Subscribers of /yisa/data2 is closed");
         });
