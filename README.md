@@ -16,12 +16,14 @@ curl --request POST \
 curl --request POST \
   --url http://127.0.0.1:3000/view \
   --data '{
-  "sql": "select a from t;"
+  "sql": "select a as e from t;"
 }'
 ```
 
 send/recv data by mqtt broker 127.0.0.1:1883
+
 send data topic: /yisa/data
+
 recv data topic: /yisa/data2
 
 ## Delete the view
