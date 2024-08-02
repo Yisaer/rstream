@@ -8,7 +8,7 @@ use crate::{
     core::{ErrorKind, SQLError, Tuple, Type},
     sql::{
         planner::{scalar::bind_scalar, scope::Scope},
-        runtime::{DDLJob},
+        runtime::DDLJob,
         session::context::QueryContext,
     },
 };
@@ -16,9 +16,9 @@ use crate::{
 use super::{
     aggregate::AggregateFunctionVisitor,
     bind_context::BindContext,
-    Column,
-    Plan,
-    scalar::bind_aggregate_function, ScalarExpr, scope::{QualifiedNamePrefix, Variable},
+    scalar::bind_aggregate_function,
+    scope::{QualifiedNamePrefix, Variable},
+    Column, Plan, ScalarExpr,
 };
 
 struct FlattenedSelectItem {
@@ -28,6 +28,25 @@ struct FlattenedSelectItem {
 
 pub struct Binder<'a> {
     ctx: &'a mut QueryContext,
+}
+
+#[derive(Clone, Debug)]
+pub struct ProjItem {
+    pub index: usize,
+    pub name: String,
+    pub alias_name: String,
+    pub is_column: bool,
+}
+
+impl ProjItem {
+    pub fn new(index: usize, name: String, alias_name: String, is_column: bool) -> Self {
+        ProjItem {
+            index,
+            name,
+            alias_name,
+            is_column,
+        }
+    }
 }
 
 impl<'a> Binder<'a> {
@@ -265,7 +284,12 @@ impl<'a> Binder<'a> {
             for expr in &select_stmt.group_by {
                 let scalar = bind_scalar(ctx, &from_scope, expr)?;
 
-                if let ScalarExpr::Column(Column { index, name }) = &scalar {
+                if let ScalarExpr::Column(Column {
+                    column_name,
+                    table_name,
+                    index,
+                }) = &scalar
+                {
                     // If the group key is a column, we don't need to evaluate it
                     group_scope
                         .variables
@@ -336,12 +360,27 @@ impl<'a> Binder<'a> {
         let mut scalar_maps = vec![];
         for select_item in flattened_select_list.iter() {
             let scalar = bind_scalar(ctx, &group_scope, &select_item.expr)?;
-            if let ScalarExpr::Column(Column { index, name }) = scalar {
+            if let ScalarExpr::Column(Column {
+                column_name,
+                table_name,
+                index,
+            }) = scalar
+            {
                 // If the select item is a column, we don't need to evaluate it
-                output_projections.push((index, name.clone()));
+                output_projections.push(ProjItem::new(
+                    index,
+                    column_name.clone(),
+                    select_item.alias.clone(),
+                    true,
+                ));
             } else {
                 scalar_maps.push(scalar);
-                output_projections.push((group_scope.variables.len(), select_item.alias.clone()));
+                output_projections.push(ProjItem::new(
+                    group_scope.variables.len(),
+                    select_item.alias.clone(),
+                    select_item.alias.clone(),
+                    false,
+                ));
             }
         }
         if !scalar_maps.is_empty() {
@@ -354,14 +393,14 @@ impl<'a> Binder<'a> {
         // Project the result
         let plan = Plan::Project {
             input: Box::new(plan),
-            projections: output_projections.iter().map(|(index, name)| (*index, name.clone())).collect(),
+            projections: output_projections.iter().map(|item| item.clone()).collect(),
         };
 
         let output_scope = Scope {
             variables: output_projections
                 .iter()
-                .map(|(_, name)| Variable {
-                    name: name.clone(),
+                .map(|item| Variable {
+                    name: item.name.clone(),
                     prefix: None,
                     expr: None,
                 })
@@ -402,9 +441,9 @@ impl<'a> Binder<'a> {
                                         Some(Ident::new(prefix.table_name.clone())),
                                         Some(Ident::new(v.name.clone())),
                                     ]
-                                        .into_iter()
-                                        .flatten()
-                                        .collect(),
+                                    .into_iter()
+                                    .flatten()
+                                    .collect(),
                                 ),
                                 alias: v.name.clone(),
                             }
@@ -586,9 +625,9 @@ impl<'a> Binder<'a> {
         for variable in scope.variables.iter_mut() {
             match &mut variable.prefix {
                 Some(QualifiedNamePrefix {
-                         schema_name,
-                         table_name,
-                     }) => {
+                    schema_name,
+                    table_name,
+                }) => {
                     *schema_name = None;
                     *table_name = alias.name.to_string();
                 }

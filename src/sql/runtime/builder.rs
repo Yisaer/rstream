@@ -4,17 +4,16 @@ use crate::{
     sql::{
         expression::{
             aggregate::AggregateFunctionRegistry,
-            type_check::{ColumnTypeResolver, type_check, type_check_aggregate_function},
+            type_check::{type_check, type_check_aggregate_function, ColumnTypeResolver},
         },
-        planner::{Column, Plan},
+        planner::{binder::ProjItem, Column, Plan},
         session::context::QueryContext,
     },
 };
 
 use super::executor::{
-    DDLExecutor, ExecuteTreeNode, Executor, FilterExecutor, HashAggregateExecutor,
-    MapExecutor, NestedLoopJoinExecutor, ProjectExecutor, ScanExecutor, StateModifier,
-    ValuesExecutor,
+    DDLExecutor, ExecuteTreeNode, Executor, FilterExecutor, HashAggregateExecutor, MapExecutor,
+    NestedLoopJoinExecutor, ProjectExecutor, ScanExecutor, StateModifier, ValuesExecutor,
 };
 
 /// Schema of the tuple in current context
@@ -24,11 +23,11 @@ pub struct Schema {
 }
 
 impl Schema {
-    pub fn project(&self, projections: &[(usize, String)]) -> Self {
+    pub fn project(&self, projections: &[ProjItem]) -> Self {
         Self {
             column_types: projections
                 .iter()
-                .map(|index| self.column_types[index.0].clone())
+                .map(|item| self.column_types[item.index].clone())
                 .collect(),
         }
     }
@@ -86,7 +85,7 @@ impl<'a> ExecutorBuilder<'a> {
                         Box::new(input_executor.unwrap_execute_tree_node()),
                         projections.clone(),
                     ))
-                        .into(),
+                    .into(),
                     schema.project(projections),
                 ))
             }
@@ -137,7 +136,7 @@ impl<'a> ExecutorBuilder<'a> {
                         Box::new(input_executor),
                         predicate_fn,
                     ))
-                        .into(),
+                    .into(),
                     schema,
                 ))
             }
@@ -183,7 +182,7 @@ impl<'a> ExecutorBuilder<'a> {
                         Box::new(right_executor),
                         Box::new(left_executor),
                     ))
-                        .into(),
+                    .into(),
                     schema,
                 ))
             }
@@ -237,13 +236,14 @@ impl<'a> ExecutorBuilder<'a> {
                         group_by,
                         aggregates,
                     ))
-                        .into(),
+                    .into(),
                     schema,
                 ))
             }
 
             Plan::Explain(display_str) => {
-                let values_exec = ExecuteTreeNode::from(ValuesExecutor::new(vec![Tuple::new_default()])).into();
+                let values_exec =
+                    ExecuteTreeNode::from(ValuesExecutor::new(vec![Tuple::new_default()])).into();
                 Ok((values_exec, Schema::default()))
             }
             Plan::Use(schema_name) => Ok((

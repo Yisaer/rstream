@@ -1,6 +1,6 @@
-use std::collections::HashMap;
-use std::fmt::Display;
+use std::{collections::HashMap, fmt::Display};
 
+use crate::sql::planner::binder::ProjItem;
 use serde_json::Value;
 
 use super::Datum;
@@ -35,13 +35,17 @@ impl Tuple {
         self.values.get(index).cloned()
     }
 
-    pub fn project(&self, indices: &[(usize, String)]) -> Tuple {
+    pub fn project(&self, indices: &[ProjItem]) -> Tuple {
         let mut new_keys = Vec::new();
         let mut new_values = Vec::new();
 
-        for (_, key) in indices {
-            if let Some(index) = self.keys.iter().position(|k| k == key) {
-                new_keys.push(key.clone());
+        for item in indices {
+            if let Some(index) = self.keys.iter().position(|k| *k == item.name) {
+                if !item.alias_name.is_empty() {
+                    new_keys.push(item.alias_name.clone())
+                } else {
+                    new_keys.push(item.name.clone())
+                }
                 new_values.push(self.values[index].clone());
             }
         }

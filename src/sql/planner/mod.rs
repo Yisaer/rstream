@@ -1,8 +1,8 @@
 use std::fmt::Display;
 
-use crate::core::Datum;
+use crate::{core::Datum, sql::planner::binder::ProjItem};
 
-use super::runtime::{DDLJob};
+use super::runtime::DDLJob;
 
 pub mod aggregate;
 pub mod bind_context;
@@ -27,7 +27,7 @@ pub enum Plan {
         input: Box<Plan>,
     },
     Project {
-        projections: Vec<(usize, String)>,
+        projections: Vec<ProjItem>,
         input: Box<Plan>,
     },
     Filter {
@@ -54,7 +54,8 @@ pub enum Plan {
 
 #[derive(Debug, Clone, PartialEq)]
 pub struct Column {
-    pub name: String,
+    pub column_name: String,
+    pub table_name: String,
     pub index: usize,
 }
 
@@ -122,7 +123,7 @@ fn indent_format_plan(f: &mut std::fmt::Formatter, plan: &Plan, indent: usize) -
                 indent_str,
                 projections
                     .iter()
-                    .map(|v| format!("#{}", v.1.clone()))
+                    .map(|v| format!("#{}", v.name.clone()))
                     .collect::<Vec<_>>()
                     .join(", ")
             )?;

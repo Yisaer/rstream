@@ -35,24 +35,10 @@ impl Scope {
 
                     variable.1.name == column_name.to_string()
                         && variable
-                        .1
-                        .prefix
-                        .as_ref()
-                        .map_or(false, |prefix| prefix.table_name == table_name.to_string())
-                }
-                _ if ident.len() == 3 => {
-                    let schema_name = &ident[0];
-                    let table_name = &ident[1];
-                    let column_name = &ident[2];
-
-                    variable.1.name == column_name.to_string()
-                        && variable.1.prefix.as_ref().map_or(false, |prefix| {
-                        prefix.table_name == table_name.to_string()
-                            && prefix
-                            .schema_name
+                            .1
+                            .prefix
                             .as_ref()
-                            .map_or(false, |schema| schema == &schema_name.to_string())
-                    })
+                            .map_or(false, |prefix| prefix.table_name == table_name.to_string())
                 }
                 _ => false,
             })
@@ -63,7 +49,8 @@ impl Scope {
             Ok(None)
         } else if candidates.len() == 1 {
             Ok(Some(Column {
-                name: candidates[0].1.name.clone(),
+                column_name: candidates[0].1.name.clone(),
+                table_name: candidates[0].1.prefix.clone().unwrap().table_name,
                 index: candidates[0].0,
             }))
         } else {
@@ -87,7 +74,13 @@ impl Scope {
                 }
                 false
             })
-            .map(|(index, v)| ScalarExpr::Column(Column { name: v.name.clone(), index }))
+            .map(|(index, v)| {
+                ScalarExpr::Column(Column {
+                    column_name: v.name.clone(),
+                    table_name: v.prefix.clone().unwrap().table_name,
+                    index,
+                })
+            })
     }
 }
 
