@@ -1,3 +1,4 @@
+use log::info;
 use std::{collections::HashMap, fmt::Display};
 
 use crate::sql::planner::binder::ProjItem;
@@ -35,7 +36,15 @@ impl Tuple {
         self.values.get(index).cloned()
     }
 
+    pub fn get_by_name(&self, column_name: &String) -> Option<Datum> {
+        self.keys
+            .iter()
+            .position(|key| key == column_name)
+            .map(|index| self.values[index].clone())
+    }
+
     pub fn project(&self, indices: &[ProjItem]) -> Tuple {
+        // info!("Project recv {self}");
         let mut new_keys = Vec::new();
         let mut new_values = Vec::new();
 

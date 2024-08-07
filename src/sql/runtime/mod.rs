@@ -14,7 +14,7 @@ pub fn execute_plan(ctx: &mut QueryContext, plan: &Plan) -> Result<Option<View>,
     let executor = ExecutorBuilder::new(ctx).build(plan)?;
     match executor {
         executor::Executor::BuildExecuteTree(builder) => {
-            info!("{:?}", builder);
+            // info!("{:?}", builder);
             if let Ok(result_view) = builder.start(ctx) {
                 Ok(Some(result_view))
             } else {

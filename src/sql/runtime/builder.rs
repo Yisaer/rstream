@@ -116,25 +116,10 @@ impl<'a> ExecutorBuilder<'a> {
                 let (input_executor, schema) = self.build_inner(input)?;
                 let predicate = type_check(&schema, predicate)?;
 
-                let predicate_fn = Box::new(move |input: Tuple| {
-                    let result = predicate.eval(&input).unwrap_or(Datum::Boolean(false));
-
-                    if let Datum::Boolean(b) = result {
-                        return b;
-                    }
-
-                    match result.cast(&Type::Boolean) {
-                        Datum::Boolean(b) => b,
-
-                        // For null values and other failed casts, we return false
-                        _ => false,
-                    }
-                });
-
                 Ok((
                     ExecuteTreeNode::from(FilterExecutor::new(
-                        Box::new(input_executor),
-                        predicate_fn,
+                        Box::new(input_executor.unwrap_execute_tree_node()),
+                        predicate.clone(),
                     ))
                     .into(),
                     schema,

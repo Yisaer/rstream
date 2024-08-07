@@ -200,6 +200,13 @@ impl<'a> Binder<'a> {
         }
     }
 
+    fn column_or_alias(column_name: String, alias_name: String) -> String {
+        if alias_name.eq(&String::from("?column?")) {
+            return column_name;
+        }
+        return alias_name;
+    }
+
     pub fn bind_select_statement(
         &mut self,
         ctx: &mut BindContext,
@@ -370,7 +377,8 @@ impl<'a> Binder<'a> {
                 output_projections.push(ProjItem::new(
                     index,
                     column_name.clone(),
-                    select_item.alias.clone(),
+                    Binder::<'a>::column_or_alias(column_name, select_item.alias.clone()),
+                    // select_item.alias.clone(),
                     true,
                 ));
             } else {
