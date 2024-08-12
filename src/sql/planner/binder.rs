@@ -1,3 +1,4 @@
+use std::any::Any;
 use sqlparser::ast::{
     Expr, Ident, JoinConstraint, JoinOperator, ObjectName, Query, Select, SelectItem, SetExpr,
     Statement, TableAlias, TableFactor, TableWithJoins, Visit,
@@ -20,6 +21,8 @@ use super::{
     scope::{QualifiedNamePrefix, Variable},
     Column, Plan, ScalarExpr,
 };
+
+use log::info;
 
 struct FlattenedSelectItem {
     expr: Expr,
@@ -242,6 +245,16 @@ impl<'a> Binder<'a> {
                 )
             })
             .unwrap();
+
+        let group_by = select_stmt.group_by.get(0).unwrap();
+        let se = bind_scalar(ctx, &from_scope, group_by)?;
+        info!("group by {}, se {}", group_by, se);
+
+
+        // TODO: force inject window here, support parser in future
+        plan = Plan::Window {
+            input: Box::new(plan),
+        };
 
         // Handle `WHERE` clause.
         if let Some(selection) = &select_stmt.selection {

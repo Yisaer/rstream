@@ -30,6 +30,9 @@ pub enum Plan {
         projections: Vec<ProjItem>,
         input: Box<Plan>,
     },
+    Window {
+        input: Box<Plan>,
+    },
     Filter {
         predicate: ScalarExpr,
         input: Box<Plan>,
@@ -131,6 +134,13 @@ fn indent_format_plan(f: &mut std::fmt::Formatter, plan: &Plan, indent: usize) -
 
             indent_format_plan(f, input, indent + DEFAULT_FORMAT_INDENT_SIZE)
         }
+        Plan::Window { input } => {
+            write!(f, "{}Window", indent_str)?;
+            writeln!(f)?;
+
+            indent_format_plan(f, input, indent + DEFAULT_FORMAT_INDENT_SIZE)
+        }
+
         Plan::Filter { predicate, input } => {
             write!(f, "{}Filter: {}", indent_str, predicate)?;
             writeln!(f)?;

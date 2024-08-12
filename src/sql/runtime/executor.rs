@@ -4,10 +4,14 @@ use std::{
 };
 
 use derive_more::From;
+use futures::io::Window;
 use log::info;
 use rumqttc::{Event, Packet, QoS};
 use serde_json::Value;
-use tokio::sync::broadcast;
+use tokio::{
+    sync::broadcast,
+    time::{self, Duration},
+};
 
 use crate::{
     connector::MqttClient,
@@ -33,6 +37,7 @@ pub enum ExecuteTreeNode {
     Scan(ScanExecutor),
     Project(ProjectExecutor),
     Filter(FilterExecutor),
+    Window(WindowExecutor),
     Map(MapExecutor),
     NestedLoopJoin(NestedLoopJoinExecutor),
     HashAggregate(HashAggregateExecutor),
@@ -135,11 +140,66 @@ impl ExecuteTreeNode {
             ExecuteTreeNode::Project(project) => project.start(ctx),
             ExecuteTreeNode::Scan(scan) => scan.start(ctx),
             ExecuteTreeNode::Filter(filter) => filter.start(ctx),
+            ExecuteTreeNode::Window(window) => window.start(ctx),
             ExecuteTreeNode::Map(_) => todo!(),
             ExecuteTreeNode::NestedLoopJoin(_) => todo!(),
             ExecuteTreeNode::HashAggregate(_) => todo!(),
             ExecuteTreeNode::Values(_) => todo!(),
         }
+    }
+}
+
+pub struct WindowExecutor {
+    pub child: Box<ExecuteTreeNode>,
+}
+
+impl WindowExecutor {
+    pub fn new(child: Box<ExecuteTreeNode>) -> Self {
+        info!("New WindowExecutor");
+        Self { child }
+    }
+
+    pub fn start(&self, ctx: &mut QueryContext) -> Result<View, SQLError> {
+        let (stop_tx, mut stop_rx) = broadcast::channel(1);
+        let (result_tx, result_rx) = broadcast::channel(512);
+        let mut child_view = self.child.start(ctx)?;
+        tokio::spawn(async move {
+            info!("WindowExecutor listening");
+            let mut buffer = VecDeque::new();
+            let mut interval = time::interval(Duration::from_secs(10));
+            loop {
+                tokio::select! {
+                    Ok(Ok(child_result)) = child_view.result_receiver.recv() => {
+                       if let Some(tuple) = child_result {
+                            info!("WindowExecutor recv tuple {}", tuple);
+                            buffer.push_back(tuple);
+                        }
+                    }
+                     _ = interval.tick() => {
+                        if !buffer.is_empty() {
+                            for tuple in buffer.drain(..) {
+                                info!("WindowExecutor send tuple {}", tuple);
+                                result_tx.send(Ok(Some(tuple))).unwrap();
+                            }
+                        }
+                        continue
+                    }
+                    _ = stop_rx.recv() => {
+                        child_view.stop.send(()).unwrap();
+                        break;
+                    },
+                    else => {
+                        child_view.stop.send(()).unwrap();
+                        break;
+                    },
+                }
+            }
+            info!("WindowExecutor no longer listening");
+        });
+        Ok(View {
+            result_receiver: result_rx,
+            stop: stop_tx,
+        })
     }
 }
 
