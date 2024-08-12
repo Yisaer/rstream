@@ -50,7 +50,7 @@ pub fn type_check<Ctxt: ColumnTypeResolver>(
 ) -> Result<Expression, SQLError> {
     match scalar {
         ScalarExpr::Column(column) => Ok(Expression::Column(
-            column.index,
+            column.column_name.clone(),
             ctx.resolve_column_type(column)?,
         )),
         ScalarExpr::Literal(value) => Ok(Expression::Literal(value.clone(), value.typ())),

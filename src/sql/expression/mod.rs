@@ -10,7 +10,7 @@ use crate::core::{Datum, ErrorKind, SQLError, Tuple, Type};
 
 #[derive(Clone)]
 pub enum Expression {
-    Column(usize, Type),
+    Column(String, Type),
     Literal(Datum, Type),
     Function(Arc<ScalarFunction>, Vec<Expression>),
 }
@@ -26,12 +26,14 @@ impl Expression {
 
     pub fn eval(&self, tuple: &Tuple) -> Result<Datum, SQLError> {
         match self {
-            Expression::Column(index, _) => Ok(tuple.get(*index).ok_or_else(|| {
-                SQLError::new(
-                    ErrorKind::RuntimeError,
-                    format!("cannot find column at index: {index}"),
-                )
-            })?),
+            Expression::Column(column_name, _) => {
+                Ok(tuple.get_by_name(&column_name).ok_or_else(|| {
+                    SQLError::new(
+                        ErrorKind::RuntimeError,
+                        format!("cannot find column at name: {column_name}"),
+                    )
+                })?)
+            }
             Expression::Literal(value, _) => Ok(value.clone()),
             Expression::Function(func, args) => {
                 let args = args

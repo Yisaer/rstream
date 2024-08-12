@@ -78,13 +78,15 @@ async fn execute_sql(
         });
         let view_manager = state.clone();
         tokio::spawn(async move {
-            while let Ok(Ok(Some(v))) = receiver.recv().await {
-                let data = v.parse_into_json().unwrap();
-                sender
-                    .client
-                    .publish("/yisa/data2", QoS::AtLeastOnce, false, data)
-                    .await
-                    .unwrap();
+            while let Ok(Ok(result)) = receiver.recv().await {
+                if !result.is_none() {
+                    let data = result.unwrap().parse_into_json().unwrap();
+                    sender
+                        .client
+                        .publish("/yisa/data2", QoS::AtLeastOnce, false, data)
+                        .await
+                        .unwrap();
+                }
             }
             info!("Subscribers of /yisa/data2 is closed");
         });

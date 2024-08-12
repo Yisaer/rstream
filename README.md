@@ -16,7 +16,7 @@ curl --request POST \
 curl --request POST \
   --url http://127.0.0.1:3000/view \
   --data '{
-  "sql": "select a as e from t;"
+  "sql": "select a as e from t where b > 30;"
 }'
 ```
 

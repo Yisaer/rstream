@@ -11,7 +11,7 @@ use tokio::sync::broadcast;
 
 use crate::{
     connector::MqttClient,
-    core::{tuple::Tuple, Datum, ErrorKind, SQLError},
+    core::{tuple::Tuple, Datum, ErrorKind, SQLError, Type},
     sql::{
         expression::{
             aggregate::{AggregateFunction, AggregateState},
@@ -28,7 +28,7 @@ use super::DDLJob;
 /// These commands are used to build up an execting tree which executes on a stream
 /// They will be construct the tree and execting forever until we close them.
 #[allow(clippy::upper_case_acronyms)]
-#[derive(From, Debug)]
+#[derive(From)]
 pub enum ExecuteTreeNode {
     Scan(ScanExecutor),
     Project(ProjectExecutor),
@@ -48,7 +48,7 @@ pub enum StateModifier {
     Use(String),
 }
 
-#[derive(From, Debug)]
+#[derive(From)]
 pub enum Executor {
     BuildExecuteTree(ExecuteTreeNode),
     ModifyState(StateModifier),
@@ -134,7 +134,7 @@ impl ExecuteTreeNode {
         match self {
             ExecuteTreeNode::Project(project) => project.start(ctx),
             ExecuteTreeNode::Scan(scan) => scan.start(ctx),
-            ExecuteTreeNode::Filter(_) => todo!(),
+            ExecuteTreeNode::Filter(filter) => filter.start(ctx),
             ExecuteTreeNode::Map(_) => todo!(),
             ExecuteTreeNode::NestedLoopJoin(_) => todo!(),
             ExecuteTreeNode::HashAggregate(_) => todo!(),
@@ -143,7 +143,58 @@ impl ExecuteTreeNode {
     }
 }
 
-#[derive(Debug)]
+pub struct FilterExecutor {
+    pub child: Box<ExecuteTreeNode>,
+    pub predicate: Expression,
+}
+
+impl FilterExecutor {
+    pub fn new(child: Box<ExecuteTreeNode>, predicate: Expression) -> Self {
+        info!("New FilterExecutor");
+        Self { child, predicate }
+    }
+
+    fn filter(predicate: Expression, t: Option<Tuple>) -> Option<Tuple> {
+        let tuple = t.unwrap();
+        // println!("filter recv {tuple}");
+        let result = predicate.eval(&tuple).unwrap_or(Datum::Boolean(false));
+        if let Datum::Boolean(true) = result {
+            return Some(tuple.clone());
+        }
+        None
+    }
+
+    pub fn start(&self, ctx: &mut QueryContext) -> Result<View, SQLError> {
+        let (stop_tx, mut stop_rx) = broadcast::channel(1);
+        let (result_tx, result_rx) = broadcast::channel(512);
+        let mut child_view = self.child.start(ctx)?;
+        let predicate = self.predicate.clone();
+        tokio::spawn(async move {
+            info!("FilterExecutor listening");
+            loop {
+                tokio::select! {
+                    Ok(Ok(child_result)) = child_view.result_receiver.recv() => {
+                        result_tx.send(Ok(FilterExecutor::filter(predicate.clone(),child_result))).unwrap();
+                    }
+                    _ = stop_rx.recv() => {
+                        child_view.stop.send(()).unwrap();
+                        break;
+                    },
+                    else => {
+                        child_view.stop.send(()).unwrap();
+                        break;
+                    },
+                }
+            }
+            info!("ProjectExecutor no longer listening");
+        });
+        Ok(View {
+            result_receiver: result_rx,
+            stop: stop_tx,
+        })
+    }
+}
+
 pub struct ProjectExecutor {
     pub child: Box<ExecuteTreeNode>,
     pub projections: Vec<ProjItem>,
@@ -151,6 +202,7 @@ pub struct ProjectExecutor {
 
 impl ProjectExecutor {
     pub fn new(child: Box<ExecuteTreeNode>, projections: Vec<ProjItem>) -> Self {
+        info!("New ProjectExecutor");
         Self { child, projections }
     }
 
@@ -185,7 +237,6 @@ impl ProjectExecutor {
     }
 }
 
-#[derive(Debug)]
 pub struct ScanExecutor {
     schema_name: String,
     table_name: String,
@@ -194,6 +245,7 @@ pub struct ScanExecutor {
 
 impl ScanExecutor {
     pub fn new(schema_name: &str, table_name: &str) -> Self {
+        info!("New ScanExecutor");
         Self {
             scan_state: ScanState::default(),
             schema_name: schema_name.to_string(),
@@ -206,6 +258,11 @@ impl ScanExecutor {
         let id = String::from("source");
         let mut mqtt_client = MqttClient::new(&id);
         let topic = String::from("/yisa/data");
+        let def = ctx
+            .catalog
+            .find_table_by_name(&*self.schema_name, &*self.table_name)
+            .unwrap()
+            .unwrap();
         tokio::spawn(async move {
             info!("ScanExecutor listening");
             mqtt_client
@@ -214,7 +271,7 @@ impl ScanExecutor {
                 .await
                 .unwrap();
             loop {
-                let event = mqtt_client.event_loop.poll().await.unwrap();
+                // let event = mqtt_client.event_loop.poll().await.unwrap();
                 while let Ok(notification) = mqtt_client.event_loop.poll().await {
                     match notification {
                         Event::Incoming(Packet::Publish(publish)) => {
@@ -223,7 +280,7 @@ impl ScanExecutor {
                             let parsed: HashMap<String, Value> =
                                 serde_json::from_str(message.as_ref()).unwrap();
                             let tuple = Tuple::from_hashmap(parsed);
-                            // println!("recv {tuple}");
+                            // println!("scan recv {tuple}");
                             result_tx.send(Ok(Some(tuple))).unwrap();
                         }
                         _ => {}
@@ -244,15 +301,6 @@ pub struct ValuesExecutor {}
 
 impl ValuesExecutor {
     pub fn new(values: Vec<Tuple>) -> Self {
-        todo!()
-    }
-}
-
-#[derive(Debug)]
-pub struct FilterExecutor {}
-
-impl FilterExecutor {
-    pub fn new(child: Box<Executor>, predicate: Box<dyn Fn(Tuple) -> bool>) -> Self {
         todo!()
     }
 }
