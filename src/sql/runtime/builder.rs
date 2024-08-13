@@ -112,12 +112,12 @@ impl<'a> ExecutorBuilder<'a> {
                     schema,
                 ))
             }
-            Plan::Window { input } => {
+            Plan::Window { window_type,length,input } => {
                 let (input_executor, schema) = self.build_inner(input)?;
                 Ok((
                     ExecuteTreeNode::from(WindowExecutor::new(Box::new(
                         input_executor.unwrap_execute_tree_node(),
-                    )))
+                    ), (*window_type).clone(), (*length).clone()))
                     .into(),
                     schema,
                 ))

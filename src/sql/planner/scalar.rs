@@ -13,11 +13,7 @@ pub fn bind_scalar(
     }
 
     match expr {
-        Expr::Identifier(ident) => {
-            println!("here1");
-            println!("here2");
-            bind_ident(ctx, scope, &[ident.clone()])
-        },
+        Expr::Identifier(ident) => bind_ident(ctx, scope, &[ident.clone()]),
         Expr::CompoundIdentifier(idents) => bind_ident(ctx, scope, idents),
         Expr::Value(literal) => bind_literal(literal),
         Expr::Function(func) => bind_function(ctx, scope, func),

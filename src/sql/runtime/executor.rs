@@ -26,6 +26,7 @@ use crate::{
     },
     storage::relation::ScanState,
 };
+use crate::sql::planner::WindowType;
 
 use super::DDLJob;
 
@@ -150,35 +151,38 @@ impl ExecuteTreeNode {
 }
 
 pub struct WindowExecutor {
+    window_type: WindowType,
+    length : i64,
     pub child: Box<ExecuteTreeNode>,
 }
 
 impl WindowExecutor {
-    pub fn new(child: Box<ExecuteTreeNode>) -> Self {
+    pub fn new(child: Box<ExecuteTreeNode>, window_type: WindowType, length :i64) -> Self {
         info!("New WindowExecutor");
-        Self { child }
+        Self { window_type,length,child }
     }
 
     pub fn start(&self, ctx: &mut QueryContext) -> Result<View, SQLError> {
         let (stop_tx, mut stop_rx) = broadcast::channel(1);
         let (result_tx, result_rx) = broadcast::channel(512);
         let mut child_view = self.child.start(ctx)?;
+        let window_length = self.length as u64;
         tokio::spawn(async move {
             info!("WindowExecutor listening");
             let mut buffer = VecDeque::new();
-            let mut interval = time::interval(Duration::from_secs(10));
+            let mut interval = time::interval(Duration::from_secs(window_length));
             loop {
                 tokio::select! {
                     Ok(Ok(child_result)) = child_view.result_receiver.recv() => {
                        if let Some(tuple) = child_result {
-                            info!("WindowExecutor recv tuple {}", tuple);
+                            // info!("WindowExecutor recv tuple {}", tuple);
                             buffer.push_back(tuple);
                         }
                     }
                      _ = interval.tick() => {
                         if !buffer.is_empty() {
                             for tuple in buffer.drain(..) {
-                                info!("WindowExecutor send tuple {}", tuple);
+                                // info!("WindowExecutor send tuple {}", tuple);
                                 result_tx.send(Ok(Some(tuple))).unwrap();
                             }
                         }
