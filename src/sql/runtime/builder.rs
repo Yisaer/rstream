@@ -14,6 +14,7 @@ use crate::{
 use super::executor::{
     DDLExecutor, ExecuteTreeNode, Executor, FilterExecutor, HashAggregateExecutor, MapExecutor,
     NestedLoopJoinExecutor, ProjectExecutor, ScanExecutor, StateModifier, ValuesExecutor,
+    WindowExecutor,
 };
 
 /// Schema of the tuple in current context
@@ -108,6 +109,16 @@ impl<'a> ExecutorBuilder<'a> {
 
                 Ok((
                     ExecuteTreeNode::from(ScanExecutor::new(schema_name, table_name)).into(),
+                    schema,
+                ))
+            }
+            Plan::Window { window_type,length,input } => {
+                let (input_executor, schema) = self.build_inner(input)?;
+                Ok((
+                    ExecuteTreeNode::from(WindowExecutor::new(Box::new(
+                        input_executor.unwrap_execute_tree_node(),
+                    ), (*window_type).clone(), (*length).clone()))
+                    .into(),
                     schema,
                 ))
             }

@@ -2,6 +2,7 @@ use sqlparser::ast::{
     Expr, Ident, JoinConstraint, JoinOperator, ObjectName, Query, Select, SelectItem, SetExpr,
     Statement, TableAlias, TableFactor, TableWithJoins, Visit,
 };
+use std::any::Any;
 
 use crate::{
     catalog::defs::{ColumnDefinition, TableDefinition},
@@ -13,13 +14,10 @@ use crate::{
     },
 };
 
-use super::{
-    aggregate::AggregateFunctionVisitor,
-    bind_context::BindContext,
-    scalar::bind_aggregate_function,
-    scope::{QualifiedNamePrefix, Variable},
-    Column, Plan, ScalarExpr,
-};
+use super::{aggregate::AggregateFunctionVisitor, bind_context::BindContext, scalar::bind_aggregate_function, scope::{QualifiedNamePrefix, Variable}, Column, Plan, ScalarExpr, WindowType};
+
+use crate::core::Datum;
+use log::info;
 
 struct FlattenedSelectItem {
     expr: Expr,
@@ -243,6 +241,47 @@ impl<'a> Binder<'a> {
             })
             .unwrap();
 
+        let mut group_by = select_stmt.group_by.clone();
+
+        if group_by.len() == 1 {
+            let group_by_expr = group_by.get(0).unwrap();
+            let se = bind_scalar(ctx, &from_scope, group_by_expr)?;
+            match se {
+                ScalarExpr::FunctionCall(name, args) => {
+                    if name.eq(&String::from("tumblingWindow")) {
+                        if args.len() == 2 {
+                            match args[0].clone() {
+                                ScalarExpr::Literal(datum) => match datum {
+                                    Datum::String(s) => {
+                                        if s.eq(&String::from("ss")) {
+                                            match args[1].clone() {
+                                                ScalarExpr::Literal(datum) => match datum {
+                                                    Datum::Int(v) => {
+                                                        plan = Plan::Window {
+                                                            window_type: WindowType::TumblingWindow,
+                                                            length: v,
+                                                            input: Box::new(plan),
+                                                        };
+                                                        group_by.remove(0);
+                                                    }
+                                                    _ => {
+                                                    }
+                                                },
+                                                _ => {}
+                                            }
+                                        }
+                                    }
+                                    _ => {}
+                                },
+                                _ => {}
+                            }
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
         // Handle `WHERE` clause.
         if let Some(selection) = &select_stmt.selection {
             let scalar = bind_scalar(ctx, &from_scope, selection)?;
@@ -283,14 +322,13 @@ impl<'a> Binder<'a> {
         };
 
         // Handle `GROUP BY` clause and `HAVING` clause.
-        let group_scope = if !select_stmt.group_by.is_empty() {
+        let group_scope = if !group_by.is_empty() {
             // First, we will add the group by keys to the scope.
             // And from now on, the from scope will no longer be valid.
             let mut group_scope = Scope::default();
             let mut group_keys = vec![];
-            for expr in &select_stmt.group_by {
+            for expr in &group_by {
                 let scalar = bind_scalar(ctx, &from_scope, expr)?;
-
                 if let ScalarExpr::Column(Column {
                     column_name,
                     table_name,

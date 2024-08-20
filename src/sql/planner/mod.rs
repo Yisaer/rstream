@@ -15,6 +15,12 @@ pub struct QualifiedObjectName {
     pub names: Vec<String>,
 }
 
+#[derive(Debug, Clone)]
+pub enum WindowType {
+    TumblingWindow
+}
+
+
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
 pub enum Plan {
@@ -28,6 +34,11 @@ pub enum Plan {
     },
     Project {
         projections: Vec<ProjItem>,
+        input: Box<Plan>,
+    },
+    Window {
+        window_type: WindowType,
+        length: i64,
         input: Box<Plan>,
     },
     Filter {
@@ -131,6 +142,13 @@ fn indent_format_plan(f: &mut std::fmt::Formatter, plan: &Plan, indent: usize) -
 
             indent_format_plan(f, input, indent + DEFAULT_FORMAT_INDENT_SIZE)
         }
+        Plan::Window { input, .. } => {
+            write!(f, "{}Window", indent_str)?;
+            writeln!(f)?;
+
+            indent_format_plan(f, input, indent + DEFAULT_FORMAT_INDENT_SIZE)
+        }
+
         Plan::Filter { predicate, input } => {
             write!(f, "{}Filter: {}", indent_str, predicate)?;
             writeln!(f)?;
