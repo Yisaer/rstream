@@ -251,22 +251,19 @@ impl<'a> Binder<'a> {
             let group_by_expr = group_by.first().unwrap();
             let se = bind_scalar(ctx, &from_scope, group_by_expr)?;
             if let ScalarExpr::FunctionCall(name, args) = se {
-                if name.eq(&String::from("tumblingWindow")) && args.len() == 2 {
-                    if let ScalarExpr::Literal(datum) = args[0].clone() {
-                        if let Datum::String(s) = datum {
-                            if s.eq(&String::from("ss")) {
-                                if let ScalarExpr::Literal(datum) = args[1].clone() {
-                                    if let Datum::Int(v) = datum {
-                                        plan = Plan::Window {
-                                            window_type: WindowType::TumblingWindow,
-                                            length: v,
-                                            input: Box::new(plan),
-                                        };
-                                        group_by.remove(0);
-                                    }
-                                }
-                            }
-                        }
+                if name == "tumblingWindow" && args.len() == 2 {
+                    if let (
+                        ScalarExpr::Literal(Datum::String(s)),
+                        ScalarExpr::Literal(Datum::Int(v)),
+                    ) = (&args[0], &args[1])
+                        && s == "ss"
+                    {
+                        plan = Plan::Window {
+                            window_type: WindowType::TumblingWindow,
+                            length: *v,
+                            input: Box::new(plan),
+                        };
+                        group_by.remove(0);
                     }
                 }
             }
