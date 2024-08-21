@@ -1,22 +1,23 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::{collections::HashMap, mem, sync::Arc};
-use std::time::Duration;
+use std::{collections::HashMap, mem, sync::Arc, time::Duration};
 
 use axum::{
     extract::{self},
+    response::IntoResponse,
     routing::{delete, get, post},
     Json, Router,
 };
-use axum::response::IntoResponse;
 use log::{info, LevelFilter};
 use prometheus::{Encoder, IntGauge, Registry, TextEncoder};
 use rumqttc::QoS;
 use serde::{Deserialize, Serialize};
 use sysinfo::{CpuExt, System, SystemExt};
-use tokio::sync::{mpsc, Mutex};
-use tokio::time;
+use tokio::{
+    sync::{mpsc, Mutex},
+    time,
+};
 
 use catalog::Catalog;
 use core::Tuple;
@@ -40,14 +41,14 @@ struct AppState {
     views: HashMap<usize, View>,
     next_id: usize,
     dummy_subscribers: HashMap<usize, Vec<Tuple>>,
-    registry: Registry
+    registry: Registry,
 }
 
 impl AppState {
-    pub fn new(registry: Registry) -> Self{
+    pub fn new(registry: Registry) -> Self {
         let mut app_state = Self::default();
         app_state.registry = registry;
-        return app_state
+        return app_state;
     }
 }
 

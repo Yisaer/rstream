@@ -21,12 +21,11 @@ use crate::{
             aggregate::{AggregateFunction, AggregateState},
             Expression,
         },
-        planner::binder::ProjItem,
+        planner::{binder::ProjItem, WindowType},
         session::context::QueryContext,
     },
     storage::relation::ScanState,
 };
-use crate::sql::planner::WindowType;
 
 use super::DDLJob;
 
@@ -152,14 +151,18 @@ impl ExecuteTreeNode {
 
 pub struct WindowExecutor {
     window_type: WindowType,
-    length : i64,
+    length: i64,
     pub child: Box<ExecuteTreeNode>,
 }
 
 impl WindowExecutor {
-    pub fn new(child: Box<ExecuteTreeNode>, window_type: WindowType, length :i64) -> Self {
+    pub fn new(child: Box<ExecuteTreeNode>, window_type: WindowType, length: i64) -> Self {
         info!("New WindowExecutor");
-        Self { window_type,length,child }
+        Self {
+            window_type,
+            length,
+            child,
+        }
     }
 
     pub fn start(&self, ctx: &mut QueryContext) -> Result<View, SQLError> {
