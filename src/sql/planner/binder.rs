@@ -14,7 +14,13 @@ use crate::{
     },
 };
 
-use super::{aggregate::AggregateFunctionVisitor, bind_context::BindContext, scalar::bind_aggregate_function, scope::{QualifiedNamePrefix, Variable}, Column, Plan, ScalarExpr, WindowType};
+use super::{
+    aggregate::AggregateFunctionVisitor,
+    bind_context::BindContext,
+    scalar::bind_aggregate_function,
+    scope::{QualifiedNamePrefix, Variable},
+    Column, Plan, ScalarExpr, WindowType,
+};
 
 use crate::core::Datum;
 use log::info;
@@ -264,8 +270,7 @@ impl<'a> Binder<'a> {
                                                         };
                                                         group_by.remove(0);
                                                     }
-                                                    _ => {
-                                                    }
+                                                    _ => {}
                                                 },
                                                 _ => {}
                                             }

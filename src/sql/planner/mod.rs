@@ -17,9 +17,8 @@ pub struct QualifiedObjectName {
 
 #[derive(Debug, Clone)]
 pub enum WindowType {
-    TumblingWindow
+    TumblingWindow,
 }
-
 
 #[allow(clippy::upper_case_acronyms)]
 #[derive(Debug)]
