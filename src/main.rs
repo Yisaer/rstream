@@ -28,6 +28,7 @@ use util::SimpleLogger;
 use crate::connector::MqttClient;
 
 mod catalog;
+mod config;
 mod connector;
 mod core;
 mod sql;
@@ -155,6 +156,7 @@ async fn metrics_handler(extract::State(state): extract::State<Arc<Mutex<AppStat
 
 #[tokio::main]
 pub async fn main() {
+    config::initialize_config();
     log::set_logger(&LOGGER)
         .map(|()| log::set_max_level(LevelFilter::Info))
         .unwrap();
