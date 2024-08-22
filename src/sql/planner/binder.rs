@@ -441,10 +441,12 @@ impl<'a> Binder<'a> {
             };
         }
 
+        let is_wildcard = contains_wildcard(&select_stmt.projection);
         // Project the result
         let plan = Plan::Project {
             input: Box::new(plan),
             projections: output_projections.iter().map(|item| item.clone()).collect(),
+            is_wildcard,
         };
 
         let output_scope = Scope {
@@ -699,4 +701,13 @@ impl<'a> Binder<'a> {
             (idents[0].to_string(), idents[1].to_string())
         }
     }
+}
+
+pub fn contains_wildcard(projection: &Vec<SelectItem>) -> bool {
+    projection.iter().any(|item| {
+        matches!(
+            item,
+            SelectItem::Wildcard(_) | SelectItem::QualifiedWildcard(_, _)
+        )
+    })
 }

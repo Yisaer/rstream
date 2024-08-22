@@ -265,12 +265,17 @@ impl FilterExecutor {
 pub struct ProjectExecutor {
     pub child: Box<ExecuteTreeNode>,
     pub projections: Vec<ProjItem>,
+    pub is_wildcard: bool,
 }
 
 impl ProjectExecutor {
-    pub fn new(child: Box<ExecuteTreeNode>, projections: Vec<ProjItem>) -> Self {
+    pub fn new(child: Box<ExecuteTreeNode>, projections: Vec<ProjItem>, is_wildcard: bool) -> Self {
         info!("New ProjectExecutor");
-        Self { child, projections }
+        Self {
+            child,
+            projections,
+            is_wildcard,
+        }
     }
 
     pub fn start(&self, ctx: &mut QueryContext) -> Result<View, SQLError> {
@@ -278,12 +283,13 @@ impl ProjectExecutor {
         let (result_tx, result_rx) = broadcast::channel(512);
         let mut child_view = self.child.start(ctx)?;
         let projections = self.projections.clone();
+        let is_wildcard = self.is_wildcard.clone();
         tokio::spawn(async move {
             info!("ProjectExecutor listening");
             loop {
                 tokio::select! {
                     Ok(Ok(child_result)) = child_view.result_receiver.recv() => {
-                        result_tx.send(Ok(child_result.map(|tuple| tuple.project(&projections)))).unwrap();
+                        result_tx.send(Ok(child_result.map(|tuple| tuple.project(&projections, is_wildcard)))).unwrap();
                     }
                     _ = stop_rx.recv() => {
                         child_view.stop.send(()).unwrap();
@@ -347,7 +353,6 @@ impl ScanExecutor {
                             let parsed: HashMap<String, Value> =
                                 serde_json::from_str(message.as_ref()).unwrap();
                             let tuple = Tuple::from_hashmap(parsed);
-                            // println!("scan recv {tuple}");
                             result_tx.send(Ok(Some(tuple))).unwrap();
                         }
                         _ => {}
