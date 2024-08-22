@@ -1,3 +1,4 @@
+use log::info;
 use std::{collections::HashMap, fmt::Display};
 
 use crate::sql::planner::binder::ProjItem;
@@ -17,8 +18,8 @@ impl Tuple {
     }
 
     pub fn new_default() -> Self {
-        let values = Vec::new();
-        let columns = Vec::new();
+        let mut values = Vec::new();
+        let mut columns = Vec::new();
         Tuple::new(columns, values)
     }
 

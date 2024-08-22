@@ -90,7 +90,7 @@ pub fn bind_aggregate_function(
             ));
         }
 
-        if let Some(arg) = func.args.first() {
+        if let Some(arg) = func.args.get(0) {
             match arg {
                 ast::FunctionArg::Unnamed(arg) => match arg {
                     // Rewrite count(*) to count()
