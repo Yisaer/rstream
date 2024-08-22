@@ -1,6 +1,8 @@
 pub mod context;
 
 use log::info;
+use pgwire::api::results::FieldInfo;
+use sqlparser::ast::Statement;
 
 use self::context::QueryContext;
 use super::{
@@ -8,7 +10,7 @@ use super::{
     planner::binder::Binder,
     runtime::{execute_plan, executor::View},
 };
-use crate::core::SQLError;
+use crate::core::{SQLError, Tuple};
 
 pub struct Session {
     ctx: QueryContext,
