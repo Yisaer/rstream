@@ -34,6 +34,7 @@ pub enum Plan {
     Project {
         projections: Vec<ProjItem>,
         input: Box<Plan>,
+        is_wildcard: bool,
     },
     Window {
         window_type: WindowType,
@@ -126,7 +127,11 @@ fn indent_format_plan(f: &mut std::fmt::Formatter, plan: &Plan, indent: usize) -
 
             indent_format_plan(f, input, indent + DEFAULT_FORMAT_INDENT_SIZE)
         }
-        Plan::Project { projections, input } => {
+        Plan::Project {
+            projections,
+            input,
+            is_wildcard,
+        } => {
             write!(
                 f,
                 "{}Project: {}",

@@ -79,12 +79,17 @@ impl<'a> ExecutorBuilder<'a> {
             )),
 
             // Query plans
-            Plan::Project { projections, input } => {
+            Plan::Project {
+                projections,
+                input,
+                is_wildcard,
+            } => {
                 let (input_executor, schema) = self.build_inner(input)?;
                 Ok((
                     ExecuteTreeNode::from(ProjectExecutor::new(
                         Box::new(input_executor.unwrap_execute_tree_node()),
                         projections.clone(),
+                        is_wildcard.clone(),
                     ))
                     .into(),
                     schema.project(projections),

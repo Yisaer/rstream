@@ -43,7 +43,10 @@ impl Tuple {
             .map(|index| self.values[index].clone())
     }
 
-    pub fn project(&self, indices: &[ProjItem]) -> Tuple {
+    pub fn project(&self, indices: &[ProjItem], is_wildcard: bool) -> Tuple {
+        if is_wildcard {
+            return self.clone();
+        }
         // info!("Project recv {self}");
         let mut new_keys = Vec::new();
         let mut new_values = Vec::new();
