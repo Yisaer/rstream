@@ -4,7 +4,6 @@ pub mod executor;
 
 pub use ddl::*;
 use executor::View;
-use log::info;
 
 use self::builder::ExecutorBuilder;
 use super::{planner::Plan, session::context::QueryContext};

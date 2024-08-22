@@ -52,7 +52,7 @@ impl ScalarFunctionRegistry {
 
         self.functions
             .entry(name.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(Arc::new(scalar_func));
     }
 
@@ -82,7 +82,7 @@ impl ScalarFunctionRegistry {
 
         self.functions
             .entry(name.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(Arc::new(scalar_func));
     }
 

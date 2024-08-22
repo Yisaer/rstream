@@ -27,7 +27,7 @@ impl Expression {
     pub fn eval(&self, tuple: &Tuple) -> Result<Datum, SQLError> {
         match self {
             Expression::Column(column_name, _) => {
-                Ok(tuple.get_by_name(&column_name).ok_or_else(|| {
+                Ok(tuple.get_by_name(column_name).ok_or_else(|| {
                     SQLError::new(
                         ErrorKind::RuntimeError,
                         format!("cannot find column at name: {column_name}"),
