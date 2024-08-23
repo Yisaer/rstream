@@ -1,5 +1,3 @@
-#![feature(let_chains)]
-
 #[macro_use]
 extern crate lazy_static;
 
@@ -7,15 +5,19 @@ use std::{collections::HashMap, mem, sync::Arc, time::Duration};
 
 use axum::{
     extract::{self},
+    response::IntoResponse,
     routing::{delete, get, post},
     Json, Router,
 };
 use log::{info, LevelFilter};
-use prometheus::{Encoder, Registry, TextEncoder};
+use prometheus::{Encoder, IntGauge, Registry, TextEncoder};
 use rumqttc::QoS;
 use serde::{Deserialize, Serialize};
 use sysinfo::{CpuExt, System, SystemExt};
-use tokio::{sync::Mutex, time};
+use tokio::{
+    sync::{mpsc, Mutex},
+    time,
+};
 
 use catalog::Catalog;
 use core::Tuple;
@@ -29,7 +31,6 @@ mod catalog;
 mod config;
 mod connector;
 mod core;
-mod metrics;
 mod sql;
 mod storage;
 mod util;
@@ -41,11 +42,14 @@ struct AppState {
     views: HashMap<usize, View>,
     next_id: usize,
     dummy_subscribers: HashMap<usize, Vec<Tuple>>,
+    registry: Registry,
 }
 
 impl AppState {
-    pub fn new() -> Self {
-        Self::default()
+    pub fn new(registry: Registry) -> Self {
+        let mut app_state = Self::default();
+        app_state.registry = registry;
+        return app_state;
     }
 }
 
@@ -88,10 +92,11 @@ async fn execute_sql(
                 }
             }
         });
+        let view_manager = state.clone();
         tokio::spawn(async move {
             while let Ok(Ok(result)) = receiver.recv().await {
-                if let Some(result) = result {
-                    let data = result.parse_into_json().unwrap();
+                if !result.is_none() {
+                    let data = result.unwrap().parse_into_json().unwrap();
                     sender
                         .client
                         .publish("/yisa/data2", QoS::AtLeastOnce, false, data)
@@ -140,10 +145,11 @@ async fn ping() -> &'static str {
     "pong"
 }
 
-async fn metrics_handler() -> String {
+async fn metrics_handler(extract::State(state): extract::State<Arc<Mutex<AppState>>>) -> String {
+    let mut state = state.lock().await;
     let mut buffer = Vec::new();
     let encoder = TextEncoder::new();
-    let metric_families = prometheus::gather();
+    let metric_families = state.registry.gather();
     encoder.encode(&metric_families, &mut buffer).unwrap();
     String::from_utf8(buffer).unwrap()
 }
@@ -158,6 +164,13 @@ pub async fn main() {
     // initialize Prometheus registry
     let registry = Registry::new();
 
+    // cpu and memory gauge
+    let cpu_gauge = IntGauge::new("cpu_usage", "CPU usage in percentage").unwrap();
+    let memory_gauge = IntGauge::new("memory_usage", "Memory usage in bytes").unwrap();
+
+    // register gauge
+    registry.register(Box::new(cpu_gauge.clone())).unwrap();
+    registry.register(Box::new(memory_gauge.clone())).unwrap();
     let mut sys = System::new();
     tokio::spawn(async move {
         let mut interval = time::interval(Duration::from_secs(1));
@@ -166,12 +179,12 @@ pub async fn main() {
             sys.refresh_all();
             let cpu_usage = sys.global_cpu_info().cpu_usage() as i64;
             let memory_usage = sys.used_memory() as i64;
-            metrics::CPU.set(cpu_usage);
-            metrics::MEMORY.set(memory_usage);
+            cpu_gauge.set(cpu_usage);
+            memory_gauge.set(memory_usage);
         }
     });
 
-    let app_state = AppState::new();
+    let app_state = AppState::new(registry);
 
     // Initialize database
     let catalog = Catalog::new();
