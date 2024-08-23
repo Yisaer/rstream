@@ -196,7 +196,7 @@ pub async fn main() {
         storage_mgr,
     };
     let session = Arc::new(Mutex::new(Session::new(query_ctx)));
-    let http_addr = "127.0.0.1:3000";
+    let http_addr = "127.0.0.1:3030";
     let app = Router::new()
         .route("/metrics", get(metrics_handler))
         .route(
