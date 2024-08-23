@@ -4,6 +4,7 @@ use std::{
 };
 
 use derive_more::From;
+use futures::io::Window;
 use log::info;
 use rumqttc::{Event, Packet, QoS};
 use serde_json::Value;
@@ -14,9 +15,12 @@ use tokio::{
 
 use crate::{
     connector::MqttClient,
-    core::{tuple::Tuple, Datum, SQLError},
+    core::{tuple::Tuple, Datum, ErrorKind, SQLError, Type},
     sql::{
-        expression::{aggregate::AggregateFunction, Expression},
+        expression::{
+            aggregate::{AggregateFunction, AggregateState},
+            Expression,
+        },
         planner::{binder::ProjItem, WindowType},
         session::context::QueryContext,
     },
@@ -60,7 +64,7 @@ impl Executor {
         if let Executor::BuildExecuteTree(t) = self {
             t
         } else {
-            panic!("Is not an `ExecuteTreeNode`")
+            panic!("!!!")
         }
     }
 }
@@ -108,7 +112,7 @@ impl DDLExecutor {
                     ctx.storage_mgr.drop_relation(schema_name, table_name);
                 }
             }
-            DDLJob::ShowTables(_) => {
+            DDLJob::ShowTables(schema_name) => {
                 // I refuse to implement this as an DDL
             }
         }
@@ -279,7 +283,7 @@ impl ProjectExecutor {
         let (result_tx, result_rx) = broadcast::channel(512);
         let mut child_view = self.child.start(ctx)?;
         let projections = self.projections.clone();
-        let is_wildcard = self.is_wildcard;
+        let is_wildcard = self.is_wildcard.clone();
         tokio::spawn(async move {
             info!("ProjectExecutor listening");
             loop {
@@ -322,11 +326,16 @@ impl ScanExecutor {
         }
     }
     pub fn start(&self, ctx: &mut QueryContext) -> Result<View, SQLError> {
-        let (stop_tx, _) = broadcast::channel(1);
+        let (stop_tx, mut stop_rx) = broadcast::channel(1);
         let (result_tx, result_rx) = broadcast::channel(512);
         let id = String::from("source");
         let mut mqtt_client = MqttClient::new(&id);
         let topic = String::from("/yisa/data");
+        let def = ctx
+            .catalog
+            .find_table_by_name(&*self.schema_name, &*self.table_name)
+            .unwrap()
+            .unwrap();
         tokio::spawn(async move {
             info!("ScanExecutor listening");
             mqtt_client
@@ -335,17 +344,22 @@ impl ScanExecutor {
                 .await
                 .unwrap();
             loop {
+                // let event = mqtt_client.event_loop.poll().await.unwrap();
                 while let Ok(notification) = mqtt_client.event_loop.poll().await {
-                    if let Event::Incoming(Packet::Publish(publish)) = notification {
-                        // let topic = publish.topic.clone();
-                        let message = String::from_utf8_lossy(&publish.payload);
-                        let parsed: HashMap<String, Value> =
-                            serde_json::from_str(message.as_ref()).unwrap();
-                        let tuple = Tuple::from_hashmap(parsed);
-                        result_tx.send(Ok(Some(tuple))).unwrap();
+                    match notification {
+                        Event::Incoming(Packet::Publish(publish)) => {
+                            // let topic = publish.topic.clone();
+                            let message = String::from_utf8_lossy(&publish.payload);
+                            let parsed: HashMap<String, Value> =
+                                serde_json::from_str(message.as_ref()).unwrap();
+                            let tuple = Tuple::from_hashmap(parsed);
+                            result_tx.send(Ok(Some(tuple))).unwrap();
+                        }
+                        _ => {}
                     }
                 }
             }
+            info!("ScanExecutor no longer listening");
         });
         Ok(View {
             result_receiver: result_rx,

@@ -10,7 +10,14 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v2
+
+      - name: Set up Rust
+        uses: actions-rs/toolchain@v1
+        with:
+          toolchain: stable
+          profile: minimal
+          override: true
 
       - name: Build binary
         run: cargo build --release
@@ -24,6 +31,11 @@ jobs:
           CARGO_TERM_COLOR: always
 
       - name: Upload release asset
-        uses: softprops/action-gh-release@v2
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         with:
-          files: release.tar.gz
+          upload_url: ${{ github.event.release.upload_url }}
+          asset_path: ./release.tar.gz
+          asset_name: release.tar.gz
+          asset_content_type: application/gzip
