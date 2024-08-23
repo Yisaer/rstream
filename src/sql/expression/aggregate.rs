@@ -90,7 +90,7 @@ impl AggregateFunctionRegistry {
         });
         self.functions
             .entry(name.to_string())
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(func);
     }
 

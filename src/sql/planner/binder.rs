@@ -2,11 +2,10 @@ use sqlparser::ast::{
     Expr, Ident, JoinConstraint, JoinOperator, ObjectName, Query, Select, SelectItem, SetExpr,
     Statement, TableAlias, TableFactor, TableWithJoins, Visit,
 };
-use std::any::Any;
 
 use crate::{
     catalog::defs::{ColumnDefinition, TableDefinition},
-    core::{ErrorKind, SQLError, Tuple, Type},
+    core::{ErrorKind, SQLError, Type},
     sql::{
         planner::{scalar::bind_scalar, scope::Scope},
         runtime::DDLJob,
@@ -23,7 +22,6 @@ use super::{
 };
 
 use crate::core::Datum;
-use log::info;
 
 struct FlattenedSelectItem {
     expr: Expr,
@@ -208,7 +206,7 @@ impl<'a> Binder<'a> {
         if alias_name.eq(&String::from("?column?")) {
             return column_name;
         }
-        return alias_name;
+        alias_name
     }
 
     pub fn bind_select_statement(
@@ -250,40 +248,20 @@ impl<'a> Binder<'a> {
         let mut group_by = select_stmt.group_by.clone();
 
         if group_by.len() == 1 {
-            let group_by_expr = group_by.get(0).unwrap();
+            let group_by_expr = group_by.first().unwrap();
             let se = bind_scalar(ctx, &from_scope, group_by_expr)?;
-            match se {
-                ScalarExpr::FunctionCall(name, args) => {
-                    if name.eq(&String::from("tumblingWindow")) {
-                        if args.len() == 2 {
-                            match args[0].clone() {
-                                ScalarExpr::Literal(datum) => match datum {
-                                    Datum::String(s) => {
-                                        if s.eq(&String::from("ss")) {
-                                            match args[1].clone() {
-                                                ScalarExpr::Literal(datum) => match datum {
-                                                    Datum::Int(v) => {
-                                                        plan = Plan::Window {
-                                                            window_type: WindowType::TumblingWindow,
-                                                            length: v,
-                                                            input: Box::new(plan),
-                                                        };
-                                                        group_by.remove(0);
-                                                    }
-                                                    _ => {}
-                                                },
-                                                _ => {}
-                                            }
-                                        }
-                                    }
-                                    _ => {}
-                                },
-                                _ => {}
-                            }
-                        }
-                    }
+            if let ScalarExpr::FunctionCall(name, args) = se {
+                if name == "tumblingWindow" && args.len() == 2 && let (
+                        ScalarExpr::Literal(Datum::String(s)),
+                        ScalarExpr::Literal(Datum::Int(v)),
+                    ) = (&args[0], &args[1]) && s == "ss" {
+                    plan = Plan::Window {
+                        window_type: WindowType::TumblingWindow,
+                        length: *v,
+                        input: Box::new(plan),
+                    };
+                    group_by.remove(0);
                 }
-                _ => {}
             }
         }
 
@@ -445,7 +423,7 @@ impl<'a> Binder<'a> {
         // Project the result
         let plan = Plan::Project {
             input: Box::new(plan),
-            projections: output_projections.iter().map(|item| item.clone()).collect(),
+            projections: output_projections.to_vec(),
             is_wildcard,
         };
 

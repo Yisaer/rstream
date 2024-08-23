@@ -89,7 +89,7 @@ impl<'a> ExecutorBuilder<'a> {
                     ExecuteTreeNode::from(ProjectExecutor::new(
                         Box::new(input_executor.unwrap_execute_tree_node()),
                         projections.clone(),
-                        is_wildcard.clone(),
+                        *is_wildcard,
                     ))
                     .into(),
                     schema.project(projections),
@@ -127,7 +127,7 @@ impl<'a> ExecutorBuilder<'a> {
                     ExecuteTreeNode::from(WindowExecutor::new(
                         Box::new(input_executor.unwrap_execute_tree_node()),
                         (*window_type).clone(),
-                        (*length).clone(),
+                        *length,
                     ))
                     .into(),
                     schema,
@@ -247,8 +247,7 @@ impl<'a> ExecutorBuilder<'a> {
                     schema,
                 ))
             }
-
-            Plan::Explain(display_str) => {
+            Plan::Explain(_) => {
                 let values_exec =
                     ExecuteTreeNode::from(ValuesExecutor::new(vec![Tuple::new_default()])).into();
                 Ok((values_exec, Schema::default()))

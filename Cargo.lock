@@ -1281,6 +1281,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "prometheus-static-metric"
+version = "0.5.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f8f30cdb09c39930b8fa5e0f23cbb895ab3f766b187403a0ba0956fc1ef4f0e5"
+dependencies = [
+ "lazy_static",
+ "proc-macro2",
+ "quote",
+ "syn 1.0.109",
+]
+
+[[package]]
 name = "protobuf"
 version = "2.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1434,6 +1446,7 @@ dependencies = [
  "pgwire",
  "pretty_env_logger",
  "prometheus",
+ "prometheus-static-metric",
  "rumqttc",
  "serde",
  "serde_json",
