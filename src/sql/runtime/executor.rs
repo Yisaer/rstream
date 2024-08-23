@@ -178,14 +178,13 @@ impl WindowExecutor {
                 tokio::select! {
                     Ok(Ok(child_result)) = child_view.result_receiver.recv() => {
                        if let Some(tuple) = child_result {
-                            // info!("WindowExecutor recv tuple {}", tuple);
                             buffer.push_back(tuple);
                         }
                     }
                      _ = interval.tick() => {
                         if !buffer.is_empty() {
+                            info!("WindowExecutor send {} tuples", buffer.len());
                             for tuple in buffer.drain(..) {
-                                // info!("WindowExecutor send tuple {}", tuple);
                                 result_tx.send(Ok(Some(tuple))).unwrap();
                             }
                         }
