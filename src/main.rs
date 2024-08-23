@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::{collections::HashMap, mem, sync::Arc, time::Duration};
+use std::{collections::HashMap, mem, process::id, sync::Arc, time::Duration};
 
 use axum::{
     extract::{self},
@@ -13,7 +13,7 @@ use log::{info, LevelFilter};
 use prometheus::{Encoder, IntGauge, Registry, TextEncoder};
 use rumqttc::QoS;
 use serde::{Deserialize, Serialize};
-use sysinfo::{CpuExt, System, SystemExt};
+use sysinfo::{CpuExt, Pid, ProcessExt, System, SystemExt};
 use tokio::{
     sync::{mpsc, Mutex},
     time,
@@ -172,15 +172,16 @@ pub async fn main() {
     registry.register(Box::new(cpu_gauge.clone())).unwrap();
     registry.register(Box::new(memory_gauge.clone())).unwrap();
     let mut sys = System::new();
+    let current_pid = id() as i32;
     tokio::spawn(async move {
         let mut interval = time::interval(Duration::from_secs(1));
         loop {
             interval.tick().await;
             sys.refresh_all();
-            let cpu_usage = sys.global_cpu_info().cpu_usage() as i64;
-            let memory_usage = sys.used_memory() as i64;
-            cpu_gauge.set(cpu_usage);
-            memory_gauge.set(memory_usage);
+            if let Some(process) = sys.process(Pid::from(current_pid)) {
+                cpu_gauge.set(process.cpu_usage() as i64);
+                memory_gauge.set(process.memory() as i64);
+            }
         }
     });
 
