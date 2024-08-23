@@ -9,7 +9,8 @@ pub struct MqttClient {
 impl MqttClient {
     pub fn new(client_id: &String) -> Self {
         let config = config::get_config();
-        let mqtt_options = MqttOptions::new(client_id, &config.broker.address, 1883);
+        let mut mqtt_options = MqttOptions::new(client_id, &config.broker.address, 1883);
+        mqtt_options.set_max_packet_size(1024 * 1024 * 1024, 1024 * 1024 * 1024);
         let (client, event_loop) = AsyncClient::new(mqtt_options, 10);
         MqttClient { client, event_loop }
     }
