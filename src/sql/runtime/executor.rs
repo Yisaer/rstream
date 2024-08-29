@@ -168,7 +168,7 @@ impl WindowExecutor {
 
     pub fn start(&self, ctx: &mut QueryContext) -> Result<View, SQLError> {
         let (stop_tx, mut stop_rx) = broadcast::channel(1);
-        let (result_tx, result_rx) = broadcast::channel(512);
+        let (result_tx, result_rx) = broadcast::channel(1024);
         let mut child_view = self.child.start(ctx)?;
         let window_length = self.length as u64;
         tokio::spawn(async move {
@@ -233,7 +233,7 @@ impl FilterExecutor {
 
     pub fn start(&self, ctx: &mut QueryContext) -> Result<View, SQLError> {
         let (stop_tx, mut stop_rx) = broadcast::channel(1);
-        let (result_tx, result_rx) = broadcast::channel(512);
+        let (result_tx, result_rx) = broadcast::channel(1024);
         let mut child_view = self.child.start(ctx)?;
         let predicate = self.predicate.clone();
         tokio::spawn(async move {
@@ -280,7 +280,7 @@ impl ProjectExecutor {
 
     pub fn start(&self, ctx: &mut QueryContext) -> Result<View, SQLError> {
         let (stop_tx, mut stop_rx) = broadcast::channel(1);
-        let (result_tx, result_rx) = broadcast::channel(512);
+        let (result_tx, result_rx) = broadcast::channel(1024);
         let mut child_view = self.child.start(ctx)?;
         let projections = self.projections.clone();
         let is_wildcard = self.is_wildcard.clone();
@@ -327,7 +327,7 @@ impl ScanExecutor {
     }
     pub fn start(&self, ctx: &mut QueryContext) -> Result<View, SQLError> {
         let (stop_tx, mut stop_rx) = broadcast::channel(1);
-        let (result_tx, result_rx) = broadcast::channel(512);
+        let (result_tx, result_rx) = broadcast::channel(1024);
         let id = String::from("source");
         let mut mqtt_client = MqttClient::new(&id);
         let topic = String::from("/yisa/data");
