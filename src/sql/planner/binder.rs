@@ -254,32 +254,19 @@ impl<'a> Binder<'a> {
             let se = bind_scalar(ctx, &from_scope, group_by_expr)?;
             match se {
                 ScalarExpr::FunctionCall(name, args) => {
-                    if name.eq(&String::from("tumblingWindow")) {
-                        if args.len() == 2 {
-                            match args[0].clone() {
-                                ScalarExpr::Literal(datum) => match datum {
-                                    Datum::String(s) => {
-                                        if s.eq(&String::from("ss")) {
-                                            match args[1].clone() {
-                                                ScalarExpr::Literal(datum) => match datum {
-                                                    Datum::Int(v) => {
-                                                        plan = Plan::Window {
-                                                            window_type: WindowType::TumblingWindow,
-                                                            length: v,
-                                                            input: Box::new(plan),
-                                                        };
-                                                        group_by.remove(0);
-                                                    }
-                                                    _ => {}
-                                                },
-                                                _ => {}
-                                            }
-                                        }
-                                    }
-                                    _ => {}
-                                },
-                                _ => {}
-                            }
+                    if name == "tumblingWindow" && args.len() == 2 {
+                        if let (
+                            ScalarExpr::Literal(Datum::String(s)),
+                            ScalarExpr::Literal(Datum::Int(v)),
+                        ) = (&args[0], &args[1])
+                            && s == "ss"
+                        {
+                            plan = Plan::Window {
+                                window_type: WindowType::TumblingWindow,
+                                length: *v,
+                                input: Box::new(plan),
+                            };
+                            group_by.remove(0);
                         }
                     }
                 }
