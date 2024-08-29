@@ -3,7 +3,7 @@
 #[macro_use]
 extern crate lazy_static;
 
-use std::{collections::HashMap, mem, sync::Arc, time::Duration};
+use std::{collections::HashMap, mem, process::id, sync::Arc, time::Duration};
 
 use axum::{
     extract::{self},
@@ -14,7 +14,7 @@ use log::{info, LevelFilter};
 use prometheus::{Encoder, TextEncoder};
 use rumqttc::QoS;
 use serde::{Deserialize, Serialize};
-use sysinfo::{CpuExt, System, SystemExt};
+use sysinfo::{CpuExt, Pid, ProcessExt, System, SystemExt};
 use tokio::{sync::Mutex, time};
 
 use catalog::Catalog;
@@ -97,6 +97,7 @@ async fn execute_sql(
                         .publish("/yisa/data2", QoS::AtLeastOnce, false, data)
                         .await
                         .unwrap();
+                    metrics::RECORDS_OUT.inc();
                 }
             }
             info!("Subscribers of /yisa/data2 is closed");
@@ -150,15 +151,18 @@ async fn metrics_handler() -> String {
 
 fn start_collecting_metric() {
     let mut sys = System::new();
+    let current_pid = id() as i32;
     tokio::spawn(async move {
         let mut interval = time::interval(Duration::from_secs(1));
         loop {
             interval.tick().await;
             sys.refresh_all();
-            let cpu_usage = sys.global_cpu_info().cpu_usage() as i64;
-            let memory_usage = sys.used_memory() as i64;
-            metrics::CPU.set(cpu_usage);
-            metrics::MEMORY.set(memory_usage);
+            if let Some(process) = sys.process(Pid::from(current_pid)) {
+                let cpu_usage = process.cpu_usage() as i64;
+                let memory_usage = process.memory() as i64;
+                metrics::CPU.set(cpu_usage);
+                metrics::MEMORY.set(memory_usage);
+            }
         }
     });
 }

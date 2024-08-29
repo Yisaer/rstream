@@ -16,6 +16,7 @@ use tokio::{
 use crate::{
     connector::MqttClient,
     core::{tuple::Tuple, Datum, ErrorKind, SQLError, Type},
+    metrics,
     sql::{
         expression::{
             aggregate::{AggregateFunction, AggregateState},
@@ -330,11 +331,11 @@ impl ScanExecutor {
         let id = String::from("source");
         let mut mqtt_client = MqttClient::new(&id);
         let topic = String::from("/yisa/data");
-        let def = ctx
-            .catalog
-            .find_table_by_name(&*self.schema_name, &*self.table_name)
-            .unwrap()
-            .unwrap();
+        // let def = ctx
+        //     .catalog
+        //     .find_table_by_name(&*self.schema_name, &*self.table_name)
+        //     .unwrap()
+        //     .unwrap();
         tokio::spawn(async move {
             info!("ScanExecutor listening");
             mqtt_client
@@ -353,6 +354,7 @@ impl ScanExecutor {
                                 serde_json::from_str(message.as_ref()).unwrap();
                             let tuple = Tuple::from_hashmap(parsed);
                             result_tx.send(Ok(Some(tuple))).unwrap();
+                            metrics::RECORDS_IN.inc();
                         }
                         _ => {}
                     }
