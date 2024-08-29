@@ -198,7 +198,7 @@ pub async fn main() {
         .unwrap();
     start_collecting_metric();
     let app = app();
-    let http_addr = "127.0.0.1:3030";
+    let http_addr = "0.0.0.0:3030";
     let listener = tokio::net::TcpListener::bind(http_addr).await.unwrap();
     info!("HTTP listening to {}", http_addr);
     axum::serve(listener, app).await.unwrap();
