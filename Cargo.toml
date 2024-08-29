@@ -24,4 +24,6 @@ toml = "0.5"
 once_cell = "1.8"
 
 [dev-dependencies]
+hyper = "1.4.1"
 sqllogictest = "0.13.0"
+tower = "0.4.13"
