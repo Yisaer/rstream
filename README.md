@@ -4,7 +4,7 @@
 
 ```sh
 curl --request POST \
-  --url http://127.0.0.1:3000/view \
+  --url http://127.0.0.1:3030/view \
   --data '{
   "sql": "create table t(a int, b int,c int,d int);"
 }'
@@ -14,7 +14,7 @@ curl --request POST \
 
 ```sh
 curl --request POST \
-  --url http://127.0.0.1:3000/view \
+  --url http://127.0.0.1:3030/view \
   --data '{
   "sql": "select a as e from t where b > 30;"
 }'
